@@ -33,18 +33,24 @@ async def generate_shorts(request: ClipRequest):
         raise HTTPException(status_code=400, detail="Missing URL link.")
 
     try:
-        print("Fetching lightning stream links with cookie authentication...")
+        print("Fetching lightning stream links with anti-bot spoofing signatures...")
         
         cookie_text = os.getenv("YOUTUBE_COOKIES", "")
         with open("cloud_cookies.txt", "w") as f:
             f.write(cookie_text)
 
         ydl_opts = {
-            # FIX: Clean single-stream selector prevents matching errors during fast cloud streaming lookups
             'format': 'best[ext=mp4]/best',
             'nocheckcertificate': True,
             'quiet': True,
-            'cookiefile': 'cloud_cookies.txt'
+            'cookiefile': 'cloud_cookies.txt',
+            # FIX: Force yt-dlp to mimic official mobile app network traffic to bypass cloud server IP blocks
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'web'],
+                    'skip': ['dash', 'hls']
+                }
+            }
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
