@@ -6,7 +6,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from faster_whisper import WhisperModel
-from openai import OpenAI
+from groq import Groq
 
 app = FastAPI()
 
@@ -18,7 +18,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Pulls your free Groq key securely from your cloud server settings
+ai_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
 
 class ClipRequest(BaseModel):
