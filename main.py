@@ -2,7 +2,7 @@ import os
 import json
 import subprocess
 import yt_dlp
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -23,18 +23,16 @@ class ClipRequest(BaseModel):
     youtube_url: str
     admin_password: str
 
-@app.post("/api/generate-shorts")
-async def generate_shorts(request: ClipRequest):
-    SECRET_PASSWORD = os.getenv("ADMIN_PASSWORD", "MasterClipper2026")
-    if request.admin_password != SECRET_PASSWORD:
-        raise HTTPException(status_code=401, detail="Unauthorized.")
+# Global variable to safely hold your latest processed metadata logs
+latest_results = {"status": "idle", "clips": []}
 
-    if not request.youtube_url:
-        raise HTTPException(status_code=400, detail="Missing URL link.")
-
+def background_video_processing_pipeline(url: str):
+    global latest_results
+    latest_results["status"] = "processing"
+    latest_results["clips"] = []
+    
     try:
-        print("Fetching lightning stream links with anti-bot spoofing signatures...")
-        
+        print("Starting background video processing stream...")
         cookie_text = os.getenv("YOUTUBE_COOKIES", "")
         with open("cloud_cookies.txt", "w") as f:
             f.write(cookie_text)
@@ -44,7 +42,6 @@ async def generate_shorts(request: ClipRequest):
             'nocheckcertificate': True,
             'quiet': True,
             'cookiefile': 'cloud_cookies.txt',
-            # FIX: Force yt-dlp to mimic official mobile app network traffic to bypass cloud server IP blocks
             'extractor_args': {
                 'youtube': {
                     'player_client': ['ios', 'web'],
@@ -54,21 +51,19 @@ async def generate_shorts(request: ClipRequest):
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            meta = ydl.extract_info(request.youtube_url, download=False)
+            meta = ydl.extract_info(url, download=False)
             stream_url = meta.get('url')
 
-        # Hardcoded peak viral comedy timestamps ready to clip instantly
         clips_config = [
             {"start": "00:05:20", "duration": 35, "title": "Peak Comedy Argument", "score": 98, "id": 1},
             {"start": "00:20:40", "duration": 45, "title": "Hysterical Laughter Drop", "score": 95, "id": 2},
             {"start": "00:40:50", "duration": 40, "title": "High Energy Screaming Reaction", "score": 91, "id": 3},
         ]
 
-        generated_clips = []
+        compiled_clips = []
 
         for clip in clips_config:
             output_filename = f"static/short_{clip['id']}.mp4"
-            
             if os.path.exists(output_filename):
                 os.remove(output_filename)
 
@@ -79,15 +74,36 @@ async def generate_shorts(request: ClipRequest):
             subprocess.run(ffmpeg_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             if os.path.exists(output_filename):
-                generated_clips.append({
+                compiled_clips.append({
                     "title": clip["title"],
                     "score": clip["score"],
                     "video_url": f"https://onrender.com_{clip['id']}.mp4"
                 })
 
-        return {"status": "success", "clips": generated_clips}
+        latest_results["clips"] = compiled_clips
+        latest_results["status"] = "success"
+        print("Background pipeline completed successfully!")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        latest_results["status"] = f"failed: {str(e)}"
+        print(f"Background pipeline failed: {e}")
+
+@app.post("/api/generate-shorts")
+async def generate_shorts(request: ClipRequest, background_tasks: BackgroundTasks):
+    SECRET_PASSWORD = os.getenv("ADMIN_PASSWORD", "MasterClipper2026")
+    if request.admin_password != SECRET_PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized.")
+
+    if not request.youtube_url:
+        raise HTTPException(status_code=400, detail="Missing URL link.")
+
+    # FIX: Immediately returns an instant response message to the web client to completely stop 502 timeouts
+    background_tasks.add_task(background_video_processing_pipeline, request.youtube_url)
+    return {"status": "initiated", "message": "Heavy processing task safely queued into background threads."}
+
+@app.get("/api/clip-status")
+async def get_clip_status():
+    # Polling slot lets Lovable continuously check back later if the rendering loops are finished
+    return latest_results
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
