@@ -4,6 +4,7 @@ import subprocess
 import yt_dlp
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -15,6 +16,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+os.makedirs("static", exist_ok=True)
 
 class ClipRequest(BaseModel):
     youtube_url: str
@@ -37,8 +40,8 @@ async def generate_shorts(request: ClipRequest):
             f.write(cookie_text)
 
         ydl_opts = {
-            # FIX: Multi-tier fallback format array string lets the engine pull standard streams flawlessly
-            'format': 'mp4/bestvideo+bestaudio/best',
+            # FIX: Clean single-stream selector prevents matching errors during fast cloud streaming lookups
+            'format': 'best[ext=mp4]/best',
             'nocheckcertificate': True,
             'quiet': True,
             'cookiefile': 'cloud_cookies.txt'
@@ -58,7 +61,7 @@ async def generate_shorts(request: ClipRequest):
         generated_clips = []
 
         for clip in clips_config:
-            output_filename = f"short_{clip['id']}.mp4"
+            output_filename = f"static/short_{clip['id']}.mp4"
             
             if os.path.exists(output_filename):
                 os.remove(output_filename)
@@ -73,10 +76,12 @@ async def generate_shorts(request: ClipRequest):
                 generated_clips.append({
                     "title": clip["title"],
                     "score": clip["score"],
-                    "video_url": f"https://onrender.com{output_filename}"
+                    "video_url": f"https://onrender.com_{clip['id']}.mp4"
                 })
 
         return {"status": "success", "clips": generated_clips}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
