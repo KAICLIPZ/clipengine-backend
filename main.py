@@ -90,7 +90,7 @@ def background_video_processing_pipeline(url: str):
 
 @app.post("/api/generate-shorts")
 async def generate_shorts(request: ClipRequest, background_tasks: BackgroundTasks):
-    SECRET_PASSWORD = os.getenv("ADMIN_PASSWORD", "MasterClipper2026")
+    SECRET_PASSWORD = os.getenv("ADMIN_PASSWORD", "KaiClipz2026")
     if request.admin_password != SECRET_PASSWORD:
         raise HTTPException(status_code=401, detail="Unauthorized.")
 
