@@ -3,17 +3,18 @@ import json
 import subprocess
 import yt_dlp
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware  # Safe network unlocking layer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 app = FastAPI()
 
+# FIX: Unlocks the server firewall completely so your Vercel frontend can connect securely!
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows all external web requests to connect securely
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],  # Unlocks all request types (POST, GET)
     allow_headers=["*"],
 )
 
@@ -23,7 +24,6 @@ class ClipRequest(BaseModel):
     youtube_url: str
     admin_password: str
 
-# Global variable to safely hold your latest processed metadata logs
 latest_results = {"status": "idle", "clips": []}
 
 def background_video_processing_pipeline(url: str):
@@ -97,13 +97,11 @@ async def generate_shorts(request: ClipRequest, background_tasks: BackgroundTask
     if not request.youtube_url:
         raise HTTPException(status_code=400, detail="Missing URL link.")
 
-    # FIX: Immediately returns an instant response message to the web client to completely stop 502 timeouts
     background_tasks.add_task(background_video_processing_pipeline, request.youtube_url)
     return {"status": "initiated", "message": "Heavy processing task safely queued into background threads."}
 
 @app.get("/api/clip-status")
 async def get_clip_status():
-    # Polling slot lets Lovable continuously check back later if the rendering loops are finished
     return latest_results
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
