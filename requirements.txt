@@ -3,5 +3,5 @@ uvicorn
 pydantic
 yt-dlp
 faster-whisper
-openai
+groq
 moviepy
