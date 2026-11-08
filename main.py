@@ -30,14 +30,25 @@ async def generate_shorts(request: ClipRequest):
         raise HTTPException(status_code=400, detail="Missing URL link.")
 
     try:
-        # 1. Fetch only the metadata stream link without saving full heavy gigabytes to disk
-        print("Fetching lightning stream links...")
-        ydl_opts = {'format': 'best', 'nocheckcertificate': True, 'quiet': True}
+        print("Fetching lightning stream links with cookie authentication...")
+        
+        # FIX: Pulls your raw cookie strings from Render and creates the secure validation file automatically on boot
+        cookie_text = os.getenv("YOUTUBE_COOKIES", "")
+        with open("cloud_cookies.txt", "w") as f:
+            f.write(cookie_text)
+
+        ydl_opts = {
+            'format': 'best',
+            'nocheckcertificate': True,
+            'quiet': True,
+            'cookiefile': 'cloud_cookies.txt'
+        }
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             meta = ydl.extract_info(request.youtube_url, download=False)
             stream_url = meta.get('url')
 
-        # 2. Hardcoded peak viral comedy timestamp milestones for your specific video asset tracking runs
+        # Hardcoded peak viral comedy timestamps ready to clip instantly
         clips_config = [
             {"start": "00:05:20", "duration": 35, "title": "Peak Comedy Argument", "score": 98, "id": 1},
             {"start": "00:20:40", "duration": 45, "title": "Hysterical Laughter Drop", "score": 95, "id": 2},
@@ -46,24 +57,19 @@ async def generate_shorts(request: ClipRequest):
 
         generated_clips = []
 
-        # 3. Stream-cut, reframe vertically, and compile video files in memory instantly
         for clip in clips_config:
             output_filename = f"short_{clip['id']}.mp4"
             
-            # Clean up old temporary processing file locks if they exist
             if os.path.exists(output_filename):
                 os.remove(output_filename)
 
-            # Direct cloud stream pipeline cuts out exact segments instantly, clips them vertically to 9:16 layout frame structures
             ffmpeg_cmd = (
                 f'ffmpeg -y -ss {clip["start"]} -i "{stream_url}" -t {clip["duration"]} '
                 f'-vf "crop=ih*(9/16):ih" -c:v libx264 -preset ultrafast -crf 28 -c:a aac -b:a 128k "{output_filename}"'
             )
             subprocess.run(ffmpeg_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            # Verification checkpoint tracking check pass sequence parameters
             if os.path.exists(output_filename):
-                # Host the video links temporarily via file system streams or use Supabase bucket links
                 generated_clips.append({
                     "title": clip["title"],
                     "score": clip["score"],
