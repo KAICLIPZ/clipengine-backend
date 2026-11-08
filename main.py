@@ -32,13 +32,13 @@ async def generate_shorts(request: ClipRequest):
     try:
         print("Fetching lightning stream links with cookie authentication...")
         
-        # FIX: Pulls your raw cookie strings from Render and creates the secure validation file automatically on boot
         cookie_text = os.getenv("YOUTUBE_COOKIES", "")
         with open("cloud_cookies.txt", "w") as f:
             f.write(cookie_text)
 
         ydl_opts = {
-            'format': 'best',
+            # FIX: Multi-tier fallback format array string lets the engine pull standard streams flawlessly
+            'format': 'mp4/bestvideo+bestaudio/best',
             'nocheckcertificate': True,
             'quiet': True,
             'cookiefile': 'cloud_cookies.txt'
